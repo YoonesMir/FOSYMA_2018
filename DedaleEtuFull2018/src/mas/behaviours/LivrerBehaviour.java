@@ -33,7 +33,7 @@ public class LivrerBehaviour extends AbstractBehaviour {
 	@Override
 	public void action() {
 		try {
-			Thread.sleep(pauseCollect);
+			
 			this.map = agent.getMap();
 			this.map.setPosition();
 			boolean flag = false;
@@ -43,12 +43,13 @@ public class LivrerBehaviour extends AbstractBehaviour {
 				this.map.visiter(false);
 				DFAgentDescription[] result = DfUtils.searchExplorer("AgentTanker",(mas.abstractAgent)this.myAgent);
 				boolean done = false;
+				int cap = ((mas.abstractAgent)this.myAgent).getBackPackFreeSpace();
 				if(result != null) {
 					for(DFAgentDescription ag: result){
 						done = ((mas.abstractAgent)this.myAgent).emptyMyBackPack(ag.getName().getLocalName());
 					}
 				}
-				int cap = ((mas.abstractAgent)this.myAgent).getBackPackFreeSpace();
+				cap = ((mas.abstractAgent)this.myAgent).getBackPackFreeSpace();
 				if(done || cap == this.agent.getCapMaxBackPack()) {
 					CentralUnit.setTankerrecived(true);
 					CommonUtils.addNextBehaviour((mas.abstractAgent)this.myAgent,false);
@@ -83,7 +84,9 @@ public class LivrerBehaviour extends AbstractBehaviour {
 						return;
 					}
 					//si pas de blocage : movment
-					else { ((mas.abstractAgent)this.myAgent).moveTo(move); }
+					else {
+						Thread.sleep(pauseCollect);
+						((mas.abstractAgent)this.myAgent).moveTo(move); }
 					}
 				}
 		}

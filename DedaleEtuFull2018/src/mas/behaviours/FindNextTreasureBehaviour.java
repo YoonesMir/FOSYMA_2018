@@ -3,6 +3,7 @@ package mas.behaviours;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 
 
@@ -68,15 +69,14 @@ public class FindNextTreasureBehaviour extends AbstractBehaviour {
 					//b = true , je veux aller chercher ce Treasure/Diamonds donc activer MovmentForTreasureBehaviour
 					if(b) {
 						agent.setStartlivrer(false);
-						CommonUtils.addNextBehaviour((mas.abstractAgent)this.myAgent,false);
 					}else {
 						//sinon commecncer livrer , car je suis sûr que si je veux pas aller chercher ce Treasure/Diamonds 
 						//ça veut dire que j'ai deja qqch dans mon backpack et 
 						//la veleur de ce Treasure/Diamonds trouvé est bcp plus grand que capacité restant donc 
 						//je le touche pas pour pas perdre le valuer de ce Treasure/Diamonds
 						agent.setStartlivrer(true);
-						CommonUtils.addNextBehaviour((mas.abstractAgent)this.myAgent,false);
 					}
+					CommonUtils.addNextBehaviour((mas.abstractAgent)this.myAgent,false);
 				}
 				finished = true;
 			}
@@ -97,9 +97,14 @@ public class FindNextTreasureBehaviour extends AbstractBehaviour {
 		Path mypath = null;
 		int dist = 0;
 		int mybackfree = Integer.valueOf(((mas.abstractAgent) agentCollect).getBackPackFreeSpace());
+		ArrayList<Node> listNode = new ArrayList<Node>();
 		for(Node n : graph.getNodeSet()){
-		
 			if(idTreasureList != null &&  idTreasureList.contains(n.getId()) ) {continue;}
+			listNode.add(n);
+				
+		}
+		Collections.shuffle(listNode);
+		for(Node n : listNode) {
 			dist = 0;
 			mypath = null;
 			List<MyCouple>  att = (List<MyCouple> )n.getAttribute("contents");
@@ -127,7 +132,7 @@ public class FindNextTreasureBehaviour extends AbstractBehaviour {
 						perte = (valeur -mybackfree ) * 0.3;
 						valeur = mybackfree;
 					}
-					list.add(new MyFive(n.getId(),((double)(valeur * 1.0))/((double)dist),perte,at,map0.getCollectorOfNode(n.getId())));
+					list.add(new MyFive(n.getId(),((double)(valeur * 1.0))/((double)dist),perte,at));
 				}
 			}
 		}
@@ -138,16 +143,71 @@ public class FindNextTreasureBehaviour extends AbstractBehaviour {
 		//3,perte de valeur de T/D apres le touché 0 si valeur de T/D est plus petit ou égale à mon cap
 		//, 4 attribut sur node , 5 identifient de agent collector qui a decider aller checher T/D sur ce node
 		if(list.size() > 0){
+			if(list.size() == 1) {
+				mine.copy(list.get(0));
+				return 1;
+			}
+			
 			//ordonée list selon ordre lexo , minimiser perte et maximise rapport
 			Collections.sort(list);
+			String smaller = null;
+			HashMap<String, Object> caps = map0.getCaps();
+			HashMap<String, Object> capscopy = new HashMap<String, Object>();
+			for(String id: caps.keySet()) {
+				capscopy.put(id, caps.get(id));
+			}
+			map0.setCaps(capscopy);
+			ArrayList<String> listcopy = new ArrayList<String>();
+			int mycap = Integer.parseInt((String)caps.get(agentCollect.getMyTreasureType()+"-"+(agentCollect).getLocalName()));
+			int othercap = 0;
+			ArrayList<String> listequal = null;
 			for(MyFive five : list) {
-				if(five.getFive().equals("") || five.getFive().equals(agentCollect.getLocalName())) {
-					mine.copy(five);
-					return 1;
+				if(! listcopy.contains(five.getFirst())) {
+					smaller = null;
+					listequal = new ArrayList<String>();
+					for(String id : caps.keySet()) {
+						if(id.split("-")[0].equals((String)five.getAttribute().getLeft()) && ! id.split("-")[1].equals(agentCollect.getLocalName())) {
+							othercap = Integer.parseInt((String)caps.get(id));
+							if(othercap < mycap) {
+								smaller = id;
+								break;
+							}
+							else if(othercap == mycap ) {
+								listequal.add(id);
+							}
+						}
+					}
+					if(smaller == null) {
+						if(listequal.size() == 0) {
+							mine.copy(list.get(0));
+							return 1;
+						}
+						else {
+							String idmin = listequal.get(0);
+							for(int i = 1 ; i < listequal.size(); ++i) {
+								if(listequal.get(i).compareTo(idmin) < 0) {
+									idmin = listequal.get(i);
+								}
+							}
+							if(agentCollect.getLocalName().equals(idmin)) {
+								mine.copy(list.get(0));
+								return 1;
+							}
+							else {
+								smaller =  idmin;
+							}
+						}
+						
+					}else {
+						listcopy.add(five.getFirst());
+						caps.remove(smaller);
+					}
 				}
+				
+				
 			}
 			//Si en je sort de boucle en haut ca veut dire que tous les T/D trouvé sont marqué par qqn autre donc je choisi le meilleur
-			mine.copy( list.get(0));
+			mine.copy( list.get(list.size()-1));
 			return 1;
 		}
 		//si il n'y pas T/D à chercher 
@@ -157,12 +217,11 @@ public class FindNextTreasureBehaviour extends AbstractBehaviour {
 	private boolean fixe_next_Treasure(MyFive myFive) {
 		try {
 			AgentCollector agent = (AgentCollector) this.myAgent;
-			int cap = Integer.valueOf(((mas.abstractAgent) agent).getBackPackFreeSpace());
+			int cap =((mas.abstractAgent) agent).getBackPackFreeSpace();
 			MyCouple my = myFive.getAttribute();
 			int val = my.getRight();
 			//si jai déja qqch dans mon backpack et mon cap restant est plus petit que 80% de le velur de truc trouvé je vais pas chercher ce truc
 			if(cap < agent.getCapMaxBackPack() && cap < (0.8 * val)) return false;
-			agent.getMap().setCollectorOfNode(myFive.getFirst(),agent.getLocalName());
 			agent.setNextTarget(myFive.getFirst());
 			agent.setNexTreasure(myFive.getAttribute());
 			System.out.println(agent.getLocalName()+" chose : "+myFive.toString());

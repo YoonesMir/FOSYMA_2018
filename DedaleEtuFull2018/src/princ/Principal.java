@@ -34,12 +34,12 @@ import env.Environment.ENVtype;
 
 public class Principal {
 	//A modifier 
-	final private  static int nbAgentExplorer = 1;
-	final private  static int nbAgentCollector =1;
+	final private  static int nbAgentExplorer = 2;
+	final private  static int nbAgentCollector =3;
 	final private  static int nbAgentSilo =1;
 	final private static int nbNode = 10;
-	final private static int nbGlum = 0;
-	private  static int ntypenv = 3;
+	final private static int nbGlum = 1;
+	private  static int ntypenv = 5;
 
 	private static String hostname = "127.0.0.1"; 
 	private static HashMap<String, ContainerController> containerList=new HashMap<String, ContainerController>();// container's name - container's ref
@@ -60,6 +60,10 @@ public class Principal {
 			env= new Environment(ENVtype.DOROGOVTSEV_T,nbNode,null);
 		}
 		else if (ntypenv == 3) {
+			env=new Environment("ressources/myMap1","ressources/myMap-config1");
+			
+		}
+		else if (ntypenv == 4) {
 			env=new Environment("ressources/myMap","ressources/myMap-config");
 		}
 		else {

@@ -36,17 +36,19 @@ public class AgentTanker  extends AgentExplorateur{
 						this.setBehaviour(new MovementExplorationBehaviour((mas.abstractAgent) this,this.pauseperiod ));
 						((mas.abstractAgent) this).addBehaviour(this.getBehaviour());	
 					}else {
-						this.setCurrentBehavior("ReceiveMapBehaviour");
-						this.setBehaviour(new ReceiveMapBehaviour((mas.abstractAgent) this));
+						this.setCurrentBehavior("SendMapBehaviour");
+						boolean sendAnyModification = false;
+						if(this.cptMove == 0) sendAnyModification = true;
+						this.setBehaviour(new SendMapBehaviour((mas.abstractAgent) this,sendAnyModification,false,true ));
 						((mas.abstractAgent) this).addBehaviour(this.getBehaviour());
 					}
 				}
-				else if(this.getCurrentBehavior().equals("ReceiveMapBehaviour")) {
-					this.setCurrentBehavior("SendMapBehaviour");
-					this.setBehaviour(new SendMapBehaviour((mas.abstractAgent) this,false ));
+				else if(this.getCurrentBehavior().equals("SendMapBehaviour")) {
+					this.setCurrentBehavior("ReceiveMapBehaviour");
+					this.setBehaviour(new ReceiveMapBehaviour((mas.abstractAgent) this));
 					((mas.abstractAgent) this).addBehaviour(this.getBehaviour());
 				}
-				else if(this.getCurrentBehavior().equals("SendMapBehaviour")) {
+				else if(this.getCurrentBehavior().equals("ReceiveMapBehaviour")) {
 					this.cptMove  = this.cptMove+1;
 					this.setCurrentBehavior("MovementExplorationBehaviour");
 					this.setBehaviour(new MovementExplorationBehaviour((mas.abstractAgent) this,this.pauseperiod ));
@@ -70,7 +72,7 @@ public class AgentTanker  extends AgentExplorateur{
 			else {
 				if(this.getCurrentBehavior().equals("ReceiveMapBehaviour")) {
 					this.setCurrentBehavior("SendMapBehaviour");
-					this.setBehaviour(new SendMapBehaviour((mas.abstractAgent) this,false ));
+					this.setBehaviour(new SendMapBehaviour((mas.abstractAgent) this,false,false,true ));
 					((mas.abstractAgent) this).addBehaviour(this.getBehaviour());
 					
 				}

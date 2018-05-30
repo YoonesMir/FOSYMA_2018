@@ -27,12 +27,13 @@ public class MovementExplorationBehaviour extends AbstractBehaviour{
 	@Override
 	public void action() {
 		try {
-			Thread.sleep(pauseperiod);
+
 			Map map = this.agent.getMap();
 			map.setPosition();
 			String position = map.getPosition();
 			if(!position.equals("")) {
 				String move = null;
+				map.visiter(false);
 				if(! this.agent.getExplorationFinished()) {
 					String target = this.agent.getNextTarget();
 					if(target == null) {
@@ -62,7 +63,9 @@ public class MovementExplorationBehaviour extends AbstractBehaviour{
 									this.finished = true;
 									return;
 								}//sinon bouger
-								else { ((mas.abstractAgent)this.agent).moveTo(move); }
+								else {
+									Thread.sleep(this.pauseperiod);
+									((mas.abstractAgent)this.agent).moveTo(move); }
 							}
 						}
 						
@@ -78,7 +81,9 @@ public class MovementExplorationBehaviour extends AbstractBehaviour{
 						this.finished = true;
 						return;
 					}//sinon bouger
-					else { ((mas.abstractAgent)this.agent).moveTo(move); }
+					else { 
+						Thread.sleep(this.pauseperiod);
+						((mas.abstractAgent)this.agent).moveTo(move); }
 					
 				}
 				CommonUtils.addNextBehaviour((mas.abstractAgent)this.myAgent,false);

@@ -3,6 +3,7 @@ package mas.behaviours;
 
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -10,6 +11,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.TreeMap;
+import java.util.Map.Entry;
 
 import org.graphstream.algorithm.AStar;
 import org.graphstream.graph.Graph;
@@ -59,6 +61,8 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 	private HashMap<String,ArrayList<String>> possible = new HashMap<String,ArrayList<String>>();
 	private HashMap<String,Object> mymessage = new HashMap<String,Object> ();
 	private int nbagent = 0;
+	private boolean modeMaitreSlave;
+	private boolean prioritysdefaultDone = false;
 
 
 	
@@ -68,11 +72,12 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 	
 
 
-	public UnBlockingBehaviour(final mas.abstractAgent myagent,String lastBehaviour,BlocageUtils bu ) {
+	public UnBlockingBehaviour(final mas.abstractAgent myagent,String lastBehaviour,BlocageUtils bu,boolean modeMaitreSlave ) {
 		super(myagent);
 		this.bu = bu;
 		this.myagent = myagent;
 		this.lastBehaviour = lastBehaviour;
+		this.modeMaitreSlave = modeMaitreSlave;
 	}
 
 	
@@ -81,6 +86,8 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 	public void action() {
 		boolean b = true;
 		boolean affiche = false;
+		this.readNormalMessage();
+		this.verificationForTanker();
 		//trouver les nodes infecté par GLUM dans notre autour
 		this.stenchNodes = this.bu.getStenchNodes();
 		//si on est pas en train aller vers nodeRDV , on essaye trouver un autre target (soit un autre node pour vister
@@ -93,7 +100,7 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 			boolean cause = bu.cause_is_Glum(stenchNodes);
 			/*boolean onenodenonviste = this.verificationForOneAgent();
 			if(cause && onenodenonviste) {
-				System.out.println("just un node non visité pour  "+this.myagent.getLocalName()+" node est "+this.bu.getTarget());
+				System.out.println("just un node non visité pour solo "+this.myagent.getLocalName()+" node est "+this.bu.getTarget());
 				((AgentExplorateur)this.myagent).setUnBlockingBehaviourOFF(null);
 				this.finished = true;
 				return;
@@ -114,16 +121,19 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 					this.mymessage= this.build_message();
 					//communication
 					this.communication(this.mymessage,resultats,this.nbagent -1);
-					if(affiche)System.out.println("4 "+this.myagent.getLocalName()+" "+(new Date()).getTime());
 					if(affiche)System.out.println(this.myagent.getLocalName()+" a recu message "+this.othermsgs.keySet().size());
 					if(affiche)System.out.println(this.myagent.getLocalName()+" a envoye proprement "+this.ackmessage.keySet().size());
-					//vider la boit aux lettres
-					this.removeMailBox();
 				}
 				
 				b = true;
+				
 				if(othermsgs.keySet().size() > 0 ) {
-					
+					this.initialise(this.othermsgs);
+					if(this.casMasterSlave() && this.isExplorationPhase()) {
+						((AgentExplorateur)this.myagent).setUnBlockingBehaviourOFF(null);
+						this.finished = true;
+						return;
+					}
 					if(cause) {
 						boolean one = this.verificationForAllAgent();
 						if(one) {
@@ -133,6 +143,23 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 							return;
 						}
 						
+					}
+					if(!cause && this.modeMaitreSlave  ) {
+						if( this.casMasterSlave() ) {
+							this.buildWayMasterSlave();
+							if(this.cheminFinalNode.size() > 0) {
+								this.bu.getMap().setChemin(this.cheminFinalNode);
+								((AgentExplorateur)this.myagent).setNextTarget(this.cheminFinalNode.get(this.cheminFinalNode.size()-1).getId());
+								if(this.bu.getTypeSerach().equals("nextTreasure")) {
+									((AgentCollector)this.myagent).setNexTreasure(null);
+								}
+								((AgentExplorateur)this.myagent).setUnBlockingBehaviourOFF("JustWalkBehaviour");
+								if(affiche)System.out.println("contruit path by communication master slave "+this.myagent.getLocalName()+"  "+this.bu.getMap().getChemin()+" "+((AgentExplorateur)this.myagent).getNextTarget()+" "+this.bu.getPosition());
+								if(affiche)System.out.println(this.cheminfinals.toString());
+								this.finished = true;
+								return;
+							}
+						}
 					}
 					//creé les chemin pour sorti de position blocage 
 					this.buildUNBlockingWays(cause);
@@ -157,7 +184,7 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 						b1 = this.bu.set_path(path,true);
 						if(b1) {
 							b1 = false;
-							if(affiche)System.out.println("6 just walk alea  "+this.myagent.getLocalName()+" "+this.bu.getMap().getChemin() +" "+((AgentExplorateur)this.myagent).getNextTarget()+" "+this.bu.getPosition());
+							if(affiche)System.out.println("just walk alea  "+this.myagent.getLocalName()+" "+this.bu.getMap().getChemin() +" "+((AgentExplorateur)this.myagent).getNextTarget()+" "+this.bu.getPosition());
 							((AgentExplorateur)this.myagent).setUnBlockingBehaviourOFF("JustWalkBehaviour");
 							
 						}
@@ -196,6 +223,59 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 	}*/
 
 
+	
+
+
+
+	private boolean isExplorationPhase() {
+		for(String id : this.names_act.keySet()) {
+			if(!this.names_act.get(id).equals("MovementExplorationBehaviour")) return false;
+		}
+		for(String id : this.targets.keySet()) {
+			String nID = this.targets.get(id);
+			Node n = this.bu.getMap().getNode(nID);
+			if(n == null || !(boolean)n.getAttribute("visite")) return false;
+			
+		}
+		return true;
+	}
+
+
+
+	private boolean casMasterSlave() {
+		if(this.ackmessage.keySet().size() != this.othermsgs.keySet().size()) return false;
+		//if( this.othermsgs.keySet().size() > 1) return false;
+		boolean flag;
+		for(String id: this.othermsgs.keySet()) {
+			flag = false;
+			for(String id1 : this.ackmessage.keySet()) {
+				if(id.equals(id1)) {
+					flag = true;
+					break;
+				}
+			}
+			if(!flag) return false;
+			
+		}
+		for(String id: this.ackmessage.keySet()) {
+			flag = false;
+			for(String id1 : this.othermsgs.keySet()) {
+				if(id.equals(id1)) {
+					flag = true;
+					break;
+				}
+			}
+			if(!flag) return false;
+			
+		}
+		for(String id : this.glums.keySet()) {
+			if(this.glums.get(id).size() > 0) return false;
+		}
+		return true;
+	}
+
+
+
 	//si tous les agent ont meme target et Behaviour est MovementExplorationBehaviour est ce node n'est pas visté on just change l'eta viste de ce node
 	private boolean verificationForAllAgent() {
 		int nb = this.bu.getMap().getNbNodeNonVisite();
@@ -216,14 +296,143 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 					}
 				}
 				if(flag) {
-					if(!(boolean)n.getAttribute("visite")) {
-						n.setAttribute("visite", true);
-						((AgentExplorateur)this.myagent).addToForcevisite(n.getId());
-						return true;
-					}
-					
+					n.setAttribute("visite", true);
+					((AgentExplorateur)this.myagent).addToForcevisite(n.getId());
+					return true;
 				}
 				
+			}
+		}
+		return false;
+	}
+	
+	private boolean buildWayMasterSlave() {
+	
+		this.priorityOfAgent(false);
+		this.prioritysdefaultDone = true;
+		Entry<String,Double> ent = this.prioritysdefault.firstEntry();
+		String idMaster = ent.getKey();
+		for(String id : this.prioritysdefault.keySet()) {
+			ArrayList<String> way = new ArrayList<String>();
+			way.add(this.positions.get(id));
+			this.cheminfinals.put(id, way);
+		}
+		Graph G = this.bu.getMap().getGraph();
+		AStar astar = new AStar(G);
+		HashMap<String,ArrayList<String>> pathOrginals = new HashMap<String,ArrayList<String>>();
+		Path path = null;
+		for(String id : this.prioritysdefault.keySet()) {
+			if(! id.equals(idMaster)) {
+				String pos = this.positions.get(id);
+				astar.compute(pos,this.targets.get(idMaster));
+				path = astar.getShortestPath();
+				if(path == null) return false;
+				ArrayList<String> pathOrginal = new ArrayList<String>();
+				for(Node n : path.getNodePath()) {
+					pathOrginal.add(n.getId());
+				}
+				pathOrginals.put(id, pathOrginal);
+			}
+			else {
+				pathOrginals.put(id,  new ArrayList<String>());
+			}
+
+		}
+		return this.buildWayMasterSlaverec(pathOrginals,idMaster,this.prioritysdefault.keySet().size()-1,false,0,0);
+	}
+	
+	private boolean buildWayMasterSlaverec(HashMap<String,ArrayList<String>> pathOrginals ,String idMaster ,int start,boolean b,int nbrepaet,int nbTrue) {
+		ArrayList<String> masterWay = this.cheminfinals.get(idMaster);
+		if(masterWay.get(masterWay.size()-1).equals(this.targets.get(idMaster)) || nbrepaet>= 100 ) {
+			return this.finalBuild();
+		}
+		ArrayList<String> possibleSlave = new ArrayList<String>();
+		ArrayList<String> avoidSlave = new ArrayList<String>();
+		String idSlave = null;
+		int k = 0;
+		if(start > 0) {
+			for(String id : this.prioritysdefault.keySet()) {
+				if(k == start) {
+					idSlave = id;
+					break;
+				}
+				k += 1;
+			}
+			k = 0;
+			int s = start;
+			while(possibleSlave.size() <= 0) {
+				avoidSlave = new ArrayList<String>();
+				possibleSlave = new ArrayList<String>();
+				for(String id : this.cheminfinals.keySet()) {
+					if(k < s) {
+						avoidSlave.addAll(this.cheminfinals.get(id));
+					}
+					k += 1;
+				}
+				
+				boolean b1 = this.casespossibleSlave(pathOrginals.get(idSlave),avoidSlave,this.cheminfinals.get(idSlave),possibleSlave,false,idSlave);
+				if(b1) nbTrue+=1;
+				if(!b && nbTrue >= this.names_act.keySet().size()-1) b = true;
+				if(possibleSlave.size() <= 0) {
+					boolean aut = this.is_autorise(pathOrginals.get(idSlave));
+					if(aut ) {
+						 b1 = this.casespossibleSlave(pathOrginals.get(idSlave),avoidSlave,this.cheminfinals.get(idSlave),possibleSlave,true,idSlave);
+						if(b1) nbTrue+=1;
+						if(!b && nbTrue >= this.names_act.keySet().size()-1) b = true;
+					}
+				}
+				
+				s -= 1;
+				if(s < 0)break;
+				
+			}
+			if(possibleSlave.size() > 0) {
+				String nextSlave = this.bestForSlave_Master(possibleSlave,idMaster,false);
+				if(nextSlave != null) {
+					ArrayList<String> slaveWay = this.cheminfinals.get(idSlave);
+					slaveWay.add(nextSlave);
+					this.cheminfinals.put(idSlave, slaveWay);
+				}
+				
+			}
+		}
+		else {
+			ArrayList<String> possibleMaster = new ArrayList<String>();
+			this.casespossibleMaster(masterWay,possibleMaster,b);
+			if(0 < possibleMaster.size() ) {
+				String nextMaster =  this.bestForSlave_Master(possibleMaster,idMaster,true);
+				if(nextMaster != null) {
+					masterWay.add(nextMaster);
+					this.cheminfinals.put(idMaster, masterWay);
+				}
+				
+				
+			}
+		}
+		
+		start -= 1;
+		if(start < 0) start = this.names_act.size()-1;
+
+		return buildWayMasterSlaverec(pathOrginals,idMaster,start,b,nbrepaet+1,nbTrue);
+
+	}
+	
+
+
+	private boolean is_autorise(ArrayList<String> list) {
+		Graph G = this.bu.getMap().getGraph();
+		ArrayList<String> pos = new ArrayList<String>();
+		for(String id : this.cheminfinals.keySet()) {
+			ArrayList<String> way = this.cheminfinals.get(id);
+			pos.add(way.get(way.size()-1));
+		}
+		for(String id : list) {
+			Node n = G.getNode(id);
+			if(n == null) return false;
+			Iterator<Node> it = n.getNeighborNodeIterator();
+			while(it.hasNext()) {
+				String v = it.next().getId();
+				if(!list.contains(v) && ! pos.contains(v)  ) return true;
 			}
 		}
 		return false;
@@ -231,17 +440,189 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 
 
 
+	private boolean finalBuild() {
+		for(String id : this.cheminfinals.keySet()) {
+			ArrayList<String> way = this.cheminfinals.get(id);
+			if(way.size() > 0) {
+				way.remove(0);
+				this.cheminfinals.put(id, way);
+			}
+		}
+	
+		this.buildPathFinal();
+		return true;
+		
+	}
+
+	private void casespossibleMaster(ArrayList<String> masterWay,
+			ArrayList<String> possible,boolean aut) {
+		Graph G = this.bu.getMap().getGraph();
+	
+		String posMaster = masterWay.get(masterWay.size()-1);
+		Node cou = G.getNode(posMaster);
+		ArrayList<String> pos = new ArrayList<String>();
+		for(String id : this.cheminfinals.keySet()) {
+			ArrayList<String> w = this.cheminfinals.get(id);
+			pos.add(w.get(w.size()-1));
+		}
+		Iterator<Node> it= cou.getNeighborNodeIterator();
+		while(it.hasNext()) {
+			String n = it.next().getId();
+			if(!pos.contains(n) ) {
+				if(aut || !masterWay.contains(n)) {
+					possible.add(n);
+				}
+			}
+			
+		}
+	}
+
+	private boolean casespossibleSlave(ArrayList<String> pathOrginal,ArrayList<String> masterWay, ArrayList<String> slaveWay,
+			ArrayList<String> possible,boolean aut,String idslave) {
+		Graph G = this.bu.getMap().getGraph();
+		boolean flag  = false;
+		String posSlave = null;
+		ArrayList<String> pos = new ArrayList<String>();
+		for(String id : this.cheminfinals.keySet()) {
+			ArrayList<String> way = this.cheminfinals.get(id);
+			String p = way.get(way.size()-1);
+			pos.add(p);
+			if(id.equals(idslave))posSlave= p;
+		}
+	
+		Node cou = G.getNode(posSlave);
+		if(cou == null) return false;
+		Iterator<Node> it= cou.getNeighborNodeIterator();
+		while(it.hasNext()) {
+			String n = it.next().getId();
+			if(! pos.contains(n)  && !slaveWay.contains(n) ) {
+				if(aut ||  !pathOrginal.contains(n) ) {
+					if(!masterWay.contains(n)  ) {
+						possible.add(n);
+						flag = true;
+					}
+				}
+				
+			}
+			
+		}
+		if(!flag) {
+			it= cou.getNeighborNodeIterator();
+			while(it.hasNext()) {
+				String n = it.next().getId();
+				if(! pos.contains(n) && !slaveWay.contains(n) ) {
+					if(aut ||  ! pathOrginal.contains(n) ) {
+						possible.add(n);
+					}
+					
+				}
+				
+			}
+		}
+		if(possible.size() > 1) {
+			ArrayList<String> list = new ArrayList<String>();
+			ArrayList<String> ids = new ArrayList<String>();
+			for(String id : this.prioritysdefault.keySet()) {ids.add(id);}
+			boolean flag1 = true;
+			boolean flag2 = true;
+			while(list.size() <= 0 && flag1 ) {
+				for(String c : possible) {
+					flag2 = true;
+					for(String id : ids) {
+						if(this.cheminfinals.get(id).contains(c)) {
+							flag2 = false;
+							break;
+						}
+					}
+					if(flag2) list.add(c);
+				}
+				int size = ids.size();
+				if(size > 0) {
+					ids.remove(size -1);
+				}
+				else {
+					flag1 = false;
+				}
+			}
+			if(list.size() > 0 && list.size() < possible.size() ) {
+				possible = list;
+			}
+		}
+		return flag;
+	}
+
+	private String bestForSlave_Master(ArrayList<String> possible,String idMaster,boolean master) {
+		if(possible.size() == 1) return possible.get(0);
+		int s= 0;
+		int maxi = -1;
+		if(master) {
+			maxi = 10000;
+		}
+		HashMap<String,Integer> ids_val = new HashMap<String,Integer> ();
+		Graph G = this.bu.getMap().getGraph();
+		Path path = null;
+		for(String n : possible) {
+			if(n.equals(this.targets.get(idMaster))) return n;
+			AStar astar = new AStar(G);
+			astar.compute(n,this.targets.get(idMaster));
+			path = astar.getShortestPath();
+			if(path != null) {
+				s = path.getNodeCount();
+				ids_val.put(n, s);
+			}
+			
+		}
+		if(ids_val.keySet().size() <= 0) return null;
+		for(String id : ids_val.keySet()) {
+			int v = ids_val.get(id);
+			if(master) {
+				if(v <= maxi) {
+					maxi = v;
+				}
+			}else {
+				if(v >= maxi) {
+					maxi = v;
+				}
+			}
+		}
+		ArrayList<String> p = new ArrayList<String>();
+		for(String id: ids_val.keySet()) {
+			int v = ids_val.get(id);
+			if(v == maxi) {
+				p.add(id);
+			}
+		}
+		Collections.shuffle(p);
+		return p.get(0);
+	}
+
+
+
 	private void buildUNBlockingWays( boolean cause) {
 		//lire les message des autres qui sont enregistre dans othermsgs
-		this.initialise(this.othermsgs);
 		this.raffinerPositionGlum();
 		this.raffinerNodesBlocks();
-		this.priorityOfAgent(cause);
+		if(! this.prioritysdefaultDone) {
+			this.priorityOfAgent(cause);
+		}
 		this.whoBlockedWho(cause);
 		this.buildPathFinal();
 		
 	}
 	
+
+	private void verificationForTanker() {
+		if(this.myagent.getLocalName().startsWith("AgentCollector") && this.myagent.getBackPackFreeSpace() < ((AgentCollector)this.myagent).getCapMaxBackPack()) {
+			DFAgentDescription[] result = DfUtils.searchExplorer("AgentTanker",(mas.abstractAgent)this.myAgent);
+			if(result != null) {
+				for(DFAgentDescription ag: result){
+					((mas.abstractAgent)this.myAgent).emptyMyBackPack(ag.getName().getLocalName());
+				}
+			}
+		}
+	}
+
+
 
 	private void raffinerPositionGlum() {
 		boolean flag;
@@ -470,6 +851,44 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 		}
 		
 	}
+	private void order_default_priority(HashMap<String, Double> p, HashMap<String, ArrayList<String>> doubles,
+			boolean cause) {
+		if(cause) {
+			this.order_default_priority_by_glum(doubles,p);
+		}else {
+			this.order_default_priority_without_glum(doubles,p);
+		}
+		
+	}
+
+
+	
+
+
+
+	private void order_default_priority_without_glum(HashMap<String, ArrayList<String>> doubles,
+			HashMap<String, Double> p) {
+		ArrayList<String> d = null;
+		boolean stable = false;
+		while(!stable) {
+			stable = true;
+			for(String id : doubles.keySet()) {
+				d = doubles.get(id);
+				for(String v : d) {
+					if(p.get(id).equals(p.get(v))) {
+						stable = false;
+						if(Math.random() > 0.5) {
+							p.put(id, (double)p.get(v)+ 0.1);
+						}else {
+							p.put(v,(double) p.get(id)+ 0.1);
+						}
+					}
+					
+				}
+			}
+		}
+		
+	}
 
 
 
@@ -490,7 +909,7 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 							p.put(v, (double)p.get(id)+ 0.1);
 						}
 						else {
-							if(id.compareTo(v) > 0) {
+							if(Math.random() > 0.5) {
 								p.put(id, (double)p.get(v)+ 0.1);
 							}else {
 								p.put(v,(double) p.get(id)+ 0.1);
@@ -504,7 +923,39 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 
 	}
 
-
+	private void order_default_priority_by_glum(HashMap<String, ArrayList<String>> doubles, HashMap<String, Double> p) {
+		boolean stable = false;
+		ArrayList<String> d = null;
+		while(!stable) {
+			stable = true;
+			for(String id : doubles.keySet()) {
+				d = doubles.get(id);
+				for(String v : d) {
+					if(p.get(id).equals(p.get(v))) {
+						stable = false;
+						if(this.glums.get(id).size() > this.glums.get(v).size()) {
+							p.put(id,(double) p.get(v)+ 0.1);
+						}
+						else if(this.glums.get(id).size() < this.glums.get(v).size()){
+							p.put(v,(double) p.get(id)+ 0.1);
+						}
+						else {
+							
+							if(Math.random() > 0.5) {
+								p.put(id,(double) p.get(v)+ 0.1);
+							}else {
+								p.put(v,(double) p.get(id)+ 0.1);
+							}
+							
+						}
+					}
+					
+				}
+				
+			}
+		}
+		
+	}
 
 	private void order_by_priority_by_glum(HashMap<String, ArrayList<String>> doubles, HashMap<String, Double> p) {
 		ArrayList<String> d = null;
@@ -531,7 +982,7 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 								p.put(v,(double) p.get(id)+ 0.1);
 							}
 							else {
-								if(id.compareTo(v) > 0) {
+								if(Math.random() > 0.5) {
 									p.put(id,(double) p.get(v)+ 0.1);
 								}else {
 									p.put(v,(double) p.get(id)+ 0.1);
@@ -615,11 +1066,16 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 			priority =  (double ) (prioritybyrole *  prioritybyact * prioritybyglum * prioritbychemin);
 			p.put(agentname,priority);
 		}
-	
+		HashMap<String, ArrayList<String>> doubles = this.find_doubles(p);
+		this.order_default_priority(p,doubles,cause);
         this.prioritysdefault.putAll(p);
 	}
 	
 
+
+
+
+	
 
 
 
@@ -690,52 +1146,135 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 			String position =(String) msg.get("posiotion");
 			this.positions.put(name, position);
 			this.firstpositions.put(name, position);
-			double cap = (double)msg.get("cap");
+			double cap = Double.parseDouble((String) msg.get("cap"));
 			if(cap > 0.0)this.capacitys.put(name, cap);
 		}
 	}
 	
+	@SuppressWarnings("unchecked")
 	private void removeMailBox() {
 		MessageTemplate msgTemplate = MessageTemplate.MatchPerformative(ACLMessage.PROPAGATE);
+		HashMap<String,HashMap<String, HashMap<String, HashMap<String, Object>>>> onemsg = null;
+		HashMap<String, HashMap<String, HashMap<String, Object>>> mapseri = null;
+		HashMap<String, Object> info = null;
 		ACLMessage msg = null;
-		do {msg = ((mas.abstractAgent) this.myagent).receive(msgTemplate);}while(msg != null);
+		do {
+			msg = ((mas.abstractAgent) this.myagent).receive(msgTemplate);
+			if(msg != null) {
+				if(msg != null) {
+					onemsg = null;
+					try {
+						onemsg = (HashMap<String,HashMap<String, HashMap<String, HashMap<String, Object>>>>) msg.getContentObject();
+						if(onemsg != null) {
+							info =(HashMap<String, Object>) onemsg.get("info").get("info").get("info");
+							othermsgs.put(msg.getSender().getLocalName(), info);
+							Long d = (Long)info.get("date");
+							this.sendAcquittal(msg.getSender().getLocalName(),d);
+							mapseri = (HashMap<String, HashMap<String, HashMap<String, Object>>>)onemsg.get("map");
+							if(mapseri != null) {
+								this.bu.getMap().unifier(mapseri, msg.getSender().getLocalName(),this.myagent.getLocalName());
+							}else {
+								System.out.println("Map recu est null");
+							}
+							
+						}
+						else {
+							System.out.println("onemsg null");
+						}
+					} catch (UnreadableException e) {
+						e.printStackTrace();
+						continue;
+					}
+				}
+			}
+			
+		}while(msg != null);
 		msgTemplate = MessageTemplate.MatchPerformative(ACLMessage.INFORM_REF);
-		do {msg = ((mas.abstractAgent) this.myagent).receive(msgTemplate);}while(msg != null);	
+		do {
+			msg = ((mas.abstractAgent) this.myagent).receive(msgTemplate);
+			if(msg != null) {
+				this.ackmessage.put(msg.getSender().getLocalName(), msg.getSender().getLocalName());
+			}
+		}while(msg != null);	
 	}
 	
 	private void communication(HashMap<String, Object> m,ArrayList<DFAgentDescription[] > resultats,int nbAgent) {
+		this.removeOldMessage();
 		int nbTry = 2;
 		while(nbTry > 0) {
 			nbTry -= 1;
 			this.sendMessage(resultats,m);
 			this.reciveMessage(nbAgent);
-			if(this.othermsgs.keySet().size() == nbAgent && this.ackmessage.keySet().size()== nbAgent) break;
 		}
+		this.removeMailBox();
+	}
+	private void removeOldMessage() {
+		MessageTemplate msgTemplate = MessageTemplate.MatchPerformative(ACLMessage.INFORM_REF);
+		ACLMessage msg = null;
+		do {msg = ((mas.abstractAgent) this.myagent).receive(msgTemplate);}while(msg != null);
+		
+	}
+
+
+
+	@SuppressWarnings("unchecked")
+	private void readNormalMessage() {
+		MessageTemplate msgTemplate = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
+		ACLMessage msg = null;
+		Serializable newMap = null;
+		HashMap<String, HashMap<String, HashMap<String, Object>>> m = null;
+		Long date;
+		
+		do {
+			msg = ((mas.abstractAgent) this.myagent).receive(msgTemplate);
+			if (msg != null) {
+				try {
+					newMap = msg.getContentObject();
+				} catch (UnreadableException e) {
+					e.printStackTrace();
+					continue;
+				}
+				if(newMap != null) {
+					m = (HashMap<String, HashMap<String, HashMap<String, Object>>>) newMap;
+					if(m != null) {
+						date =  (Long) m.get("date").get("date").get("date");
+						// envoi d'un acquittement a l'envoyeur
+						((mas.abstractAgent) this.myagent).addBehaviour(new SendAcquittalReciveMap((mas.abstractAgent) myagent, msg.getSender().getLocalName(),date ));
+						this.bu.getMap().unifier(m,msg.getSender().getLocalName(),this.myagent.getLocalName());
+					}
+				}	
+			}
+		}while( msg != null );
 	}
 	
 	@SuppressWarnings("unchecked")
 	private void reciveMessage(int nbAgent) {
-		MessageTemplate msgTemplate = MessageTemplate.MatchPerformative(ACLMessage.PROPAGATE); 
+		
+		
+		MessageTemplate msgTemplate = MessageTemplate.MatchPerformative(ACLMessage.PROPAGATE);
 		HashMap<String,HashMap<String, HashMap<String, HashMap<String, Object>>>> onemsg = null;
 		HashMap<String, HashMap<String, HashMap<String, Object>>> mapseri = null;
 		HashMap<String, Object> info = null;
 		ACLMessage msg = null;
 		for(int i = 0 ; i< nbAgent; i++) {
-			msg = ((mas.abstractAgent) this.myagent).blockingReceive(msgTemplate, 150);
+			msg = ((mas.abstractAgent) this.myagent).receive(msgTemplate);
 			if(msg != null) {
 				onemsg = null;
 				try {
 					onemsg = (HashMap<String,HashMap<String, HashMap<String, HashMap<String, Object>>>>) msg.getContentObject();
 					if(onemsg != null) {
-						this.sendAcquittal(msg.getSender().getLocalName());
+						
 						mapseri = (HashMap<String, HashMap<String, HashMap<String, Object>>>)onemsg.get("map");
 						if(mapseri != null) {
+							Long d =(Long) mapseri.get("date").get("date").get("date");
+							this.sendAcquittal(msg.getSender().getLocalName(),d);
 							this.bu.getMap().unifier(mapseri, msg.getSender().getLocalName(),this.myagent.getLocalName());
 						}else {
 							System.out.println("Map recu est null");
 						}
 						info =(HashMap<String, Object>) onemsg.get("info").get("info").get("info");
 						othermsgs.put(msg.getSender().getLocalName(), info);
+						
 					}
 					else {
 						System.out.println("onemsg null");
@@ -745,17 +1284,27 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 					continue;
 				}
 			}
-			
+			try {
+				Thread.sleep(50);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 			this.reviceAcquittal();
 		}
 		
 	}
-	private void sendAcquittal(String receiverName) {
-		final ACLMessage msg = new ACLMessage(ACLMessage.INFORM_REF);
-		msg.setSender(((mas.abstractAgent)this.myAgent).getAID());
-		msg.addReceiver(new AID(receiverName, AID.ISLOCALNAME));
-		msg.setContent("recived");
-		((mas.abstractAgent)this.myAgent).sendMessage(msg);
+	private void sendAcquittal(String receiverName,Long date) {
+		try {
+			final ACLMessage msg = new ACLMessage(ACLMessage.INFORM_REF);
+			msg.setSender(((mas.abstractAgent)this.myAgent).getAID());
+			msg.addReceiver(new AID(receiverName, AID.ISLOCALNAME));
+			msg.setContentObject(date);
+			((mas.abstractAgent)this.myAgent).sendMessage(msg);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
 	}
 	
 	private void sendMessage(ArrayList<DFAgentDescription[]> resultats, HashMap<String, Object> m) {
@@ -786,6 +1335,11 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 					}
 					((mas.abstractAgent) this.myagent).sendMessage(msg);
 				}
+				try {
+					Thread.sleep(50);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 			}
 		
 		}
@@ -793,12 +1347,30 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 	private void reviceAcquittal() {
 		final MessageTemplate msgTemplate =  MessageTemplate.MatchPerformative(ACLMessage.INFORM_REF);
 		ACLMessage msg = null;
-		msg = ((mas.abstractAgent) this.myagent).blockingReceive(msgTemplate, 50);
-		if(msg != null)this.ackmessage.put(msg.getSender().getLocalName(), msg.getSender().getLocalName());
+		msg = ((mas.abstractAgent) this.myagent).receive(msgTemplate);
+		if(msg != null) {
+			Long date = null;
+			try {
+				date = (Long) msg.getContentObject();
+				this.ackmessage.put(msg.getSender().getLocalName(), msg.getSender().getLocalName());
+				this.bu.getMap().updateLastCommunication(msg.getSender().getLocalName(), date);
+			} catch (UnreadableException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+		}
+		try {
+			Thread.sleep(50);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 	}
 
 	private HashMap<String,Object> build_message() {
 		HashMap<String,Object> msg = new HashMap<String,Object>();
+		Long date = (new Date()).getTime();
+		msg.put("date", date);
 		String name =  this.myagent.getLocalName();
 		msg.put("name",name );
 		msg.put("behaviour", this.lastBehaviour);
@@ -807,9 +1379,9 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 		this.names_act.put(name,this.lastBehaviour);
 		msg.put("nodeblock", this.bu.getNodeblock());
 		this.nodeblocks.put(name, this.bu.getNodeblocks());
-		msg.put("posiotion", this.bu.getPosition());
-		this.positions.put(name, this.bu.getPosition());
-		this.firstpositions.put(name, this.bu.getPosition());
+		msg.put("posiotion", this.bu.getMap().getPosition());
+		this.positions.put(name, this.bu.getMap().getPosition());
+		this.firstpositions.put(name, this.bu.getMap().getPosition());
 		String chemin ="";
 		ArrayList<String> mychemin = new ArrayList<String>();
 		if(this.bu.getLast_chemin() != null) {
@@ -842,7 +1414,7 @@ public class UnBlockingBehaviour extends AbstractBehaviour{
 				}
 			}
 		}
-		msg.put("cap", cap);
+		msg.put("cap", String.valueOf(cap));
 		if(cap > 0.0) {
 			this.capacitys.put(name, cap);
 		}

@@ -83,15 +83,6 @@ public class Sextuple  implements Comparable<Sextuple> {
 			if(this.third < arg0.getThird()) return -1;
 			if(this.four > arg0.getFour()) return 1;
 			if(this.four < arg0.getFour()) return -1;
-			//spliter le nom , car sur les grilles il y a '-' dans le nom des nodes
-			String[] l1 = this.first.split("_");
-			String[] l2 = arg0.getFirst().split("_");
-			if(Integer.parseInt(l1[0]) > Integer.parseInt(l2[0])) return 1;
-			if(Integer.parseInt(l1[0]) < Integer.parseInt(l2[0]) ) return -1;
-			if(l1.length > 1 && l2.length > 1) {
-				if(Integer.parseInt(l1[1]) > Integer.parseInt(l2[1])) return 1;
-				if(Integer.parseInt(l1[1]) < Integer.parseInt(l2[1]) ) return -1;
-			}
 		}catch(Exception e) {
 			e.printStackTrace();
 			return 0;

@@ -1,7 +1,6 @@
 package mas.behaviours;
 
 
-import mas.abstractAgent;
 import mas.agents.AgentCollector;
 import mas.agents.AgentExplorateur;
 import utils.CommonUtils;
@@ -14,7 +13,7 @@ public class JustWalkBehaviour   extends AbstractBehaviour{
 	private boolean finished = false;
 	private Long pauseperiod;
 
-	public JustWalkBehaviour(abstractAgent abstractAgent,Long pauseperiod) {
+	public JustWalkBehaviour(final mas.abstractAgent abstractAgent,Long pauseperiod) {
 		super(abstractAgent);
 		this.pauseperiod = pauseperiod;
 	}
@@ -23,11 +22,13 @@ public class JustWalkBehaviour   extends AbstractBehaviour{
 	@Override
 	public void action() {
 		try {
-			Thread.sleep(pauseperiod);
+			
 			AgentExplorateur agent = (AgentExplorateur) this.myAgent;
 			Map map = agent.getMap();
 			map.setPosition();
+			
 			String position = map.getPosition();
+			
 			if(!position.equals("")) {
 				//visiter ce node et autour
 				map.visiter(false);
@@ -47,7 +48,9 @@ public class JustWalkBehaviour   extends AbstractBehaviour{
 					finished = true;
 				}
 				//sinon bouger
-				else {((mas.abstractAgent)agent).moveTo(move);}
+				else {
+					Thread.sleep(pauseperiod);
+					((mas.abstractAgent)agent).moveTo(move);}
 			}	
 		}catch(Exception e) {e.printStackTrace();}
 		

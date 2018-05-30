@@ -16,7 +16,7 @@ public class MovmentTankerBehaviour  extends AbstractBehaviour{
 	private Long pauseperiod;
 
 	public MovmentTankerBehaviour(final mas.abstractAgent myagent,Long pauseperiod) {
-		super(myagent);
+		 super(myagent);
 		 this.agent = (AgentTanker) this.myAgent;
 		 this.pauseperiod = pauseperiod;
 	}
@@ -24,7 +24,6 @@ public class MovmentTankerBehaviour  extends AbstractBehaviour{
 	@Override
 	public void action() {
 		try {
-			Thread.sleep(pauseperiod);
 			Map map = this.agent.getMap();
 			map.setPosition();
 			if(!map.getPosition().equals("")) {
@@ -44,7 +43,10 @@ public class MovmentTankerBehaviour  extends AbstractBehaviour{
 					this.finished = true;
 					return;
 				}
-				else {((mas.abstractAgent) this.agent).moveTo(move);}
+				else {
+					Thread.sleep(pauseperiod);
+					((mas.abstractAgent) this.agent).moveTo(move);
+					}
 				CommonUtils.addNextBehaviour((mas.abstractAgent)this.myAgent,false);
 				this.finished = true;
 			}

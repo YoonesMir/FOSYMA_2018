@@ -27,29 +27,31 @@ public class RandomWalkBehaviour extends AbstractBehaviour{
 	@Override
 	public void action() {
 		try {
-			Thread.sleep(pauseperiod);
 			AgentCollector agent = (AgentCollector) this.myAgent;
-			//terminer le jeu si il n'y a plus agnet collector 
-			if(agent.game_over()) {
-				((mas.abstractAgent) agent).addBehaviour(new emptyMailbox((mas.abstractAgent) agent ));
-				this.finished = true;
-			}else {
-				Map map = agent.getMap();
-				map.setPosition();
-				if(!map.getPosition().equals("")) {
-					map.visiter(false);
-					//movment alea 
-					MyCouple m = map.next_move_with_target("Not target",false,true,false,"slow");
-					String move = (String)m.getLeft();
-					int v = m.getRight();
-					if(v != 0) {
-						agent.activeProcessUnblocking(move, map.getPosition(),map.getLast_move(),v);
-						this.finished = true;
-						return;
-					}//sinon bouger
-					else { ((mas.abstractAgent)agent).moveTo(move); }
+			Map map = agent.getMap();
+			map.setPosition();
+			if(!map.getPosition().equals("")) {
+				map.visiter(false);
+				if(agent.game_over()) {
+					((mas.abstractAgent) agent).addBehaviour(new emptyMailbox((mas.abstractAgent) agent ));
+					this.finished = true;
+					return;
 				}
-			}
+				
+				//movment alea 
+				MyCouple m = map.next_move_with_target("Not target",false,true,false,"slow");
+				String move = (String)m.getLeft();
+				int v = m.getRight();
+				if(v != 0) {
+					agent.activeProcessUnblocking(move, map.getPosition(),map.getLast_move(),v);
+					this.finished = true;
+					return;
+				}//sinon bouger
+				else { 
+					Thread.sleep(pauseperiod);
+					((mas.abstractAgent)agent).moveTo(move);
+					}
+			}	
 		}
 		catch(Exception e) {e.printStackTrace();}
 	}

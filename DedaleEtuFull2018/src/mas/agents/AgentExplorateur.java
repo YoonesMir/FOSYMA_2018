@@ -30,7 +30,6 @@ public class AgentExplorateur extends abstractAgent {
 
 
 	private static final long serialVersionUID = 2617609839649870623L;
-	private boolean blockingAcitve = false;
 	private String nextTarget = null;
 	private String role = null;
 	private String currentBehavior = null;
@@ -38,9 +37,22 @@ public class AgentExplorateur extends abstractAgent {
 	private Map map = null;
     private BlocageUtils bu = null;
     protected int cptMove = 0;
-    final protected int  cptMoveCycle = 25;
+    final protected int  cptMoveCycle = 10;
     protected Long pauseperiod = 100L;
+    protected int capMaxBackPack = -1;
     
+    
+    
+    public int getCapMaxBackPack() {
+ 	   return this.capMaxBackPack;
+     }
+    
+    //On initialise une seule fois valeur de max back pack
+    public void setCapMaxBackPack() {
+ 	   if(this.capMaxBackPack == -1) {
+ 		   this.capMaxBackPack = Integer.valueOf(((mas.abstractAgent) this).getBackPackFreeSpace());
+ 	   }
+    }
     
     public int sizeForcevisite() {
     	return this.map.sizeForcevisite();
@@ -75,9 +87,8 @@ public class AgentExplorateur extends abstractAgent {
     	this.map.setExplorationFinished(b);
 		if(b) {
 			this.setNextTarget(null);
-			this.map.setFirstTimeExploration(false);
-			if(this.sizeForcevisite() > 0 && ! ( this instanceof AgentCollector)) {
-				
+			if(this.sizeForcevisite() > 0 && !( this instanceof AgentCollector) && !( this instanceof AgentTanker)) {
+				this.map.setFirstTimeExploration(false);
 				System.out.println("Relancer expolaration pour "+this.getLocalName()+" nb force visite "+this.sizeForcevisite() );
 				this.map.setAllNodes(false);
 				this.map.setExplorationFinished(false);
@@ -86,7 +97,6 @@ public class AgentExplorateur extends abstractAgent {
 			}
 			//information partagé entre tous les agents
 			if (this instanceof AgentTanker) CentralUnit.setTankerFinished(true);
-
 			if(this.map.isFirstTimeExploration()) {
 				if(this instanceof AgentCollector) {
 					System.out.println(((mas.abstractAgent)this).getLocalName()+" stop exploration :  nb Node : "+this.map.nbNodes()+" avec carte: "+this.map.toString(false));
@@ -95,6 +105,7 @@ public class AgentExplorateur extends abstractAgent {
 				}
 				
 			}
+			this.map.setFirstTimeExploration(false);
 		}
     }
 
@@ -119,6 +130,11 @@ public class AgentExplorateur extends abstractAgent {
 	private void setDefaultBehaviour() {
 		this.setCurrentBehavior("VisiteBehaviour");
 		this.setBehaviour(new VisiteBehaviour((mas.abstractAgent)this));
+		if(this.role.startsWith("AgentCollect")) {
+			((mas.abstractAgent)this).addBehaviour(new RandomGiveToTanker(this,300));
+			this.setCapMaxBackPack();
+		}
+		this.map.setCapsDefaul();
 		((mas.abstractAgent)this).addBehaviour(this.behaviour);
 	}
 	
@@ -150,23 +166,13 @@ public class AgentExplorateur extends abstractAgent {
 		return false;
 	}
 	
-	protected boolean isBlocageAvitve() {
-		return blockingAcitve;
-	}
+
 	
-	public void setBlocageAvitve(boolean blockingAcitve) {
-		this.blockingAcitve = blockingAcitve;
-		if(blockingAcitve) {
-			String beh = this.getCurrentBehavior();
-			//activer UnBlockingBehaviour
-			this.setBehaviour(new UnBlockingBehaviour((mas.abstractAgent) this,beh,this.bu));
- 			((mas.abstractAgent) this).addBehaviour(this.getBehaviour());
-		}
-	}
 	//chque fois que on est bloqué on fait appele à cette méthod
 	public void activeProcessUnblocking(String nodeblock,String position,String target,int mode) {
 		this.removeCurrentBehavior();
 		this.map.setPosition();
+		position = this.map.getPosition();
 		String typeSearch = null;
 		if(this.getCurrentBehavior().equals("MovementExplorationBehaviour") ) {
 			typeSearch = "nextForVisite";
@@ -183,12 +189,13 @@ public class AgentExplorateur extends abstractAgent {
 		this.bu = new BlocageUtils((mas.abstractAgent)this,nodeblock,position,target,this.getMap(),typeSearch,this.map.getChemin());
 		this.map.setChemin(null);
 		this.map.setLastPosition(null);
-		setBlocageAvitve(true);
+		String beh = this.getCurrentBehavior();
+		this.setBehaviour(new UnBlockingBehaviour((mas.abstractAgent) this,beh,this.bu,true));
+		((mas.abstractAgent) this).addBehaviour(this.getBehaviour());
 	}
 	
 	//chaque fois que on sort de UnBlockingBehaviour on fair appele à cette méthod
 	public void setUnBlockingBehaviourOFF( String next_Behaviour) {
-		this.setBlocageAvitve(false);
 		this.removeCurrentBehavior();
 		this.bu = null;
 		if(next_Behaviour == null) {
@@ -216,7 +223,9 @@ public class AgentExplorateur extends abstractAgent {
 					((mas.abstractAgent) this).addBehaviour(this.getBehaviour());	
 				}else {
 					this.setCurrentBehavior("SendMapBehaviour");
-					this.setBehaviour(new SendMapBehaviour((mas.abstractAgent) this,false ));
+					boolean sendAnyModification = false;
+					if(this.cptMove == 0) sendAnyModification = true;
+					this.setBehaviour(new SendMapBehaviour((mas.abstractAgent) this,sendAnyModification,false,true ));
 					((mas.abstractAgent) this).addBehaviour(this.getBehaviour());
 				}
 			}
@@ -264,13 +273,10 @@ public class AgentExplorateur extends abstractAgent {
     protected void setup(){
         super.setup();
         this.setupArguments();
-        try {
-			Thread.sleep(100);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
         this.setDefaultBehaviour();
     }
     
-    protected void takeDown(){ }
+    public void takeDown(){
+    	this.doDelete();
+    }
 }

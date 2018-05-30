@@ -35,7 +35,6 @@ public class MovmentForTreasureBehaviour extends AbstractBehaviour {
 	@Override
 	public void action() {
 		try {
-			Thread.sleep(pauseCollect);
 			this.map.setPosition();
 			String position = this.map.getPosition();
 			boolean done = false;
@@ -68,22 +67,22 @@ public class MovmentForTreasureBehaviour extends AbstractBehaviour {
 						System.out.println(agent.getLocalName()+" pickup "+pickup+" in position "+position+" ce T/D n'est pas en danger ");
 					}
 					else {
-						System.out.println(agent.getLocalName()+" pickup "+pickup+" in position "+position+" ce T/D est  en danger donc on a changé le plain ");
+						System.out.println(agent.getLocalName()+" pickup "+pickup+" in position "+position+" ce T/D est  en danger ");
 					}
-					this.map.setCollectorOfNode(position, "");
+					
 					cap = ((mas.abstractAgent)this.myAgent).getBackPackFreeSpace();
 					//revister ce node
 					this.map.visiter(false);
 					//si pickup > 0 
 					if(pickup > 0) {
-						agent.setDone(false);
+						
 						agent.setTotalCollect(pickup+this.agent.getTotalCollect());
 						//si j'ai plus capacite je commence livre
 						if(cap <= 0) {
-							agent.setRestartFindNextT(false);
+							agent.setDone(false);
 						}//sinon je chercher un autre T/D
 						else {
-							agent.setRestartFindNextT(true);
+							agent.setDone(true);
 						}
 						CommonUtils.addNextBehaviour((mas.abstractAgent)this.myAgent,false);
 					}
@@ -98,7 +97,6 @@ public class MovmentForTreasureBehaviour extends AbstractBehaviour {
 					//si j'ai recu un message ou avec autre manier je sait que mon direction n'est pas valide
 					//je recommence chercher un autre T/D
 					if(not_valid_Destination()) {
-						if(nextDist != null)this.map.setCollectorOfNode(nextDist, "");
 						agent.setDone(true);
 						CommonUtils.addNextBehaviour((mas.abstractAgent)this.myAgent,false);
 						finished = true;
@@ -113,6 +111,7 @@ public class MovmentForTreasureBehaviour extends AbstractBehaviour {
 							return;
 						}
 						else {
+							Thread.sleep(pauseCollect);
 							((mas.abstractAgent) agent).moveTo((String) couple.getLeft());
 						}
 						

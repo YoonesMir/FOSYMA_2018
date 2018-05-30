@@ -23,11 +23,14 @@ public class SendMapBehaviour extends AbstractBehaviour{
 	//sendAnyModification = true il envoie la carte meme si il a fait une seul modification sur sa carte
 	//sendAnyModification = false il envoie la carte que tous les 10 modification effetctué sur la carte
 	private boolean sendAnyModification;
-	
-	public SendMapBehaviour(final mas.abstractAgent myagent,boolean sendAnyModification) {
+	private boolean totanker;
+	private boolean addNextNormal;
+	public SendMapBehaviour(final mas.abstractAgent myagent,boolean sendAnyModification,boolean totanker,boolean addNextNormal) {
 		super(myagent);
 		this.myagent = (AgentExplorateur) this.myAgent;
 		this.sendAnyModification = sendAnyModification;
+		this.addNextNormal = addNextNormal;
+		this.totanker = totanker;
 	}
 	
 	
@@ -55,9 +58,15 @@ public class SendMapBehaviour extends AbstractBehaviour{
 			}while(msg != null);
 
 			ArrayList<String> roles = new ArrayList<String>();
-			roles.add("AgentCollect");
-			roles.add("AgentTanker");
-			roles.add("AgentExplo");
+			if(totanker) {
+				roles.add("AgentTanker");	
+			}
+			else {
+				roles.add("AgentCollect");
+				roles.add("AgentTanker");
+				roles.add("AgentExplo");
+			}
+			
 
 			for(String role : roles) {
 				// recherche dans les pages jaunes
@@ -79,7 +88,7 @@ public class SendMapBehaviour extends AbstractBehaviour{
 					}
 				}
 			}
-			CommonUtils.addNextBehaviour((mas.abstractAgent)this.myAgent,false);
+			if(addNextNormal)CommonUtils.addNextBehaviour((mas.abstractAgent)this.myAgent,false);
 			this.finished = true;
 			
 		}catch(Exception e) {e.printStackTrace();}

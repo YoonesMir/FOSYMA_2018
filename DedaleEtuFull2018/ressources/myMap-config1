@@ -1,0 +1,7 @@
+mapname:test1
+treasure:0:1
+treasure:20:1
+treasure:27:1
+agentExplo:AgentExplorer1:21:-1:-1
+agentCollect:AgentCollector1:10:1:-1
+agentTanker:AgentTanker1:9:200:200

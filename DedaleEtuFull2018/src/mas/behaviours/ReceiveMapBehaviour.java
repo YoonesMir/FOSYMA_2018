@@ -16,6 +16,7 @@ public class ReceiveMapBehaviour extends AbstractBehaviour{
 	private boolean finished = false;
 	private AgentExplorateur myagent;
 
+
 	public ReceiveMapBehaviour(final mas.abstractAgent myagent) {
 		super(myagent);
 		this.myagent = (AgentExplorateur) this.myAgent;
@@ -32,13 +33,10 @@ public class ReceiveMapBehaviour extends AbstractBehaviour{
 			MessageTemplate msgTemplate;
 			ACLMessage msg = null;
 			//vider les message blocages :
-			/*msgTemplate = MessageTemplate.MatchPerformative(ACLMessage.PROPAGATE);
-			do {msg = ((mas.abstractAgent) this.myagent).receive(msgTemplate);}while(msg != null);
 			msgTemplate = MessageTemplate.MatchPerformative(ACLMessage.INFORM_REF);
-			do { msg = ((mas.abstractAgent) this.myagent).receive(msgTemplate);}while(msg != null);*/
+			do { msg = ((mas.abstractAgent) this.myagent).receive(msgTemplate);}while(msg != null);
 			
 			msgTemplate = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
-			
 			do {
 				msg = ((mas.abstractAgent) this.myagent).receive(msgTemplate);
 				if (msg != null) {

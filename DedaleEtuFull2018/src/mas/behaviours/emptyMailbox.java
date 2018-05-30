@@ -24,7 +24,7 @@ public class emptyMailbox extends AbstractBehaviour{
 		ACLMessage msg;
 		do {msg = ((mas.abstractAgent)this.myAgent).receive();}while(msg != null);
 		System.out.println(((mas.abstractAgent)this.myAgent).getLocalName()+" est mort   nb Node : "+((AgentExplorateur)this.myAgent).getMap().nbNodes());
-		((mas.abstractAgent)this.myAgent).doDelete();
+		((AgentExplorateur)this.myAgent).takeDown();
 		finished = true;
 	}
 	

@@ -2,7 +2,7 @@ package utils;
 
 import java.util.*;
 
-
+import mas.agents.*;
 import env.Attribute;
 import env.Couple;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
@@ -32,6 +32,7 @@ public class Map  implements Serializable {
 	private HashMap<String, Long> communicationHistory;
 	private HashMap<String,String> positionOtherAgents;
 	private HashMap<String, Long> dateOfPositionOtherAgents;
+	private HashMap<String, Object> caps;
 	
 	//last_Position est le position avant dernier de l'agent : ça nous aide pour trouver les sitaution blocage
 	private String last_Position;
@@ -59,6 +60,7 @@ public class Map  implements Serializable {
 	private HashMap<String,Integer> forcevisite;
     private HashMap<String,Integer> normalvisite;
     private HashMap<String,Integer> repetforcevisite;
+    private int nbNodeLast;
     
     private boolean glum;
 	
@@ -85,8 +87,24 @@ public class Map  implements Serializable {
 		this.forcevisite = new HashMap<String,Integer>();
 		this.normalvisite = new HashMap<String,Integer>();
 		this.repetforcevisite = new HashMap<String,Integer>();
+		this.caps = new HashMap<String, Object>();
 		setGlum(false);
+		setNbNodeLast(0);
 		
+	}
+	public void setCapsDefaul() {
+        if(this.myAgent instanceof AgentCollector) {
+        	String type = this.myAgent.getMyTreasureType()+"-"+this.myAgent.getLocalName();
+        	String val = Integer.toString(((AgentCollector)this.myAgent).getCapMaxBackPack());
+        	this.caps.put(type, val);
+        }
+        
+	}
+	public int getNbNodeLast() {
+		return nbNodeLast;
+	}
+	public void setNbNodeLast(int nbNodeLast) {
+		this.nbNodeLast = nbNodeLast;
 	}
 	public boolean isGlum() {
 		return glum;
@@ -97,7 +115,6 @@ public class Map  implements Serializable {
 	}
 	
 	public int sizeForcevisite() {
-		
     	return this.forcevisite.size();
     }
     
@@ -209,17 +226,7 @@ public class Map  implements Serializable {
 		this.nodeRDV = nodeRDV;
 	}
 	
-	//Chaque fois que un agent ciblé un Diamonde ou Treasure pour aller le cherche , on enregiste sont nom dans attribut de ce node
-	//pour que les autres ne vients pas chercher la meme choses
-	//on fois que on a trouvé ce node et on a rammasé le trucs, on remmets à "" le nom de Collector de ce node
-	public void setCollectorOfNode(String node, String localName) {
-		this.graph.getNode(node).setAttribute("Collector", localName);	
-	}
-	
-	public String getCollectorOfNode(String node) {
-		return this.graph.getNode(node).getAttribute("Collector");
-	}
-	
+
 	
 	public Graph getGraph(){
 		return this.graph;
@@ -247,10 +254,8 @@ public class Map  implements Serializable {
 	//return nombre nodes non visté sur la carte
 	public int getNbNodeNonVisite() {
 		int nb = 0;
-		boolean b;
 		for(Node n : this.graph.getNodeSet()) {
-			b = (boolean) n.getAttribute("visite");
-			if(!b) nb+=1 ;
+			if(!(boolean) n.getAttribute("visite")) nb+=1 ;
 		}
 		return nb;
 	}
@@ -382,7 +387,6 @@ public class Map  implements Serializable {
         		n = this.graph.addNode(c);
         		n.setAttribute("date", d);
         		n.setAttribute("contents", attr);
-        		n.setAttribute("Collector","");
             	if(n.getId().equals(this.myPosition)){
             		n.setAttribute("visite", true);
             	}else {
@@ -430,9 +434,7 @@ public class Map  implements Serializable {
 		        }
 			}
 		}
-		if(danger) {
-			this.setGlum(true);
-		}
+		if(danger) {this.setGlum(true);}
 		return danger;
 	}
 	
@@ -469,9 +471,12 @@ public class Map  implements Serializable {
         	}
         }
         if(!b && nbmodif < 10) return null;
+        
         mapprim.put("nodes", noeuds);
         mapprim.put("aretes", aretes);
-        
+        HashMap<String, HashMap<String, Object>> capsHashHash = new HashMap<>();
+        capsHashHash.put("caps", this.caps);
+        mapprim.put("caps", capsHashHash);
         //ADD date
         HashMap<String, HashMap<String, Object>> dateHashHash = new HashMap<>();
         HashMap<String, Object> dateHash = new HashMap<>();
@@ -485,7 +490,6 @@ public class Map  implements Serializable {
         posHash.put("position", getPosition());
         posHashHash.put("position", posHash);
         mapprim.put("position", posHashHash);
-   
         return mapprim;
     }
 	
@@ -515,7 +519,7 @@ public class Map  implements Serializable {
 				for (String att: newMap.get("nodes").get(node).keySet()) {
 	                n.setAttribute(att, newMap.get("nodes").get(node).get(att));
 	            }
-				n.setAttribute("date", d);
+				//n.setAttribute("date", d);
 			}
 			//si j'ai deja ce node dans ma carte
 			else {
@@ -533,26 +537,12 @@ public class Map  implements Serializable {
 							//si il y a nouvelles information
 							if(done) {
 								n.setAttribute("contents", otherAttribute);
-								n.setAttribute("date", d);
-							}
-							//si on a pas les meme inforamtion sur collector de node, on a deja testé et on sait que son inforamtion sur collector est plus recent que moi
-							if(!n.getAttribute("Collector").equals(newMap.get("nodes").get(node).get("Collector"))) {
-								n.setAttribute("Collector", newMap.get("nodes").get(node).get("Collector"));
-								n.setAttribute("date", d);
+								//n.setAttribute("date", d);
+								n.setAttribute("date", datenode);
 							}
 						}
 					}
-					//si autre n'a pas encore visité le seul information que il peut avoir est sur collector
-					else {
-						//si c'est information sur collector est plus recent que la mien
-						if( datenode.compareTo((Long) n.getAttribute("date")) > 0 ) {
-							//si on n'a pas meme information sur collector de node
-							if(!n.getAttribute("Collector").equals(newMap.get("nodes").get(node).get("Collector"))) {
-								n.setAttribute("Collector", newMap.get("nodes").get(node).get("Collector"));
-								n.setAttribute("date", d);
-							}
-						}
-					}
+
 					
 				}
 				//si j'ai pas  visité  ce node
@@ -562,40 +552,18 @@ public class Map  implements Serializable {
 						//si c'est permier fois que Exploration de la carte
 						if(isFirstTimeExploration()) {
 							for (String att: newMap.get("nodes").get(node).keySet()) {
-								if(!att.equals("Collector")) {
-									 n.setAttribute(att, newMap.get("nodes").get(node).get(att));
-									 
-								}
-								else {
-									if( datenode.compareTo((Long) n.getAttribute("date")) > 0 ) {
-										//si on n'a pas meme information sur collector de node
-										if(!n.getAttribute("Collector").equals(newMap.get("nodes").get(node).get("Collector"))) {
-											n.setAttribute("Collector", newMap.get("nodes").get(node).get("Collector"));
-										}
-									}
-								}
-								
+								n.setAttribute(att, newMap.get("nodes").get(node).get(att));
 				            }
-							n.setAttribute("date", d);
+							//n.setAttribute("date", d);
 						}
 						///si j'ai deja fait une Exploration complet de lacarte et c'est le duxime fois
 						else {
 							if( datenode.compareTo((Long) n.getAttribute("date")) > 0 ) {
 								for (String att: newMap.get("nodes").get(node).keySet()) {
 					                n.setAttribute(att, newMap.get("nodes").get(node).get(att));
-					                n.setAttribute("date", d);
+					                //n.setAttribute("date", d);
+					                n.setAttribute("date", datenode);
 					            }
-							}
-						}
-					}
-					//si autre n'a pas encore visité le seul information que il peut avoir est sur collector
-					else {
-						//si c'est information sur collector est plus recent que la mien
-						if( datenode.compareTo((Long) n.getAttribute("date")) > 0 ) {
-							//si on n'a pas meme information sur collector de node
-							if(!n.getAttribute("Collector").equals(newMap.get("nodes").get(node).get("Collector"))) {
-								n.setAttribute("Collector", newMap.get("nodes").get(node).get("Collector"));
-								n.setAttribute("date", d);
 							}
 						}
 					}
@@ -609,7 +577,7 @@ public class Map  implements Serializable {
 					Node n1 = this.graph.getNode((String) newMap.get("aretes").get(arete).get("node1"));
 					if(n0 != null && n1 != null) {
 						if(this.graph.getEdge(n0.getId()+n1.getId()) == null && this.graph.getEdge(n1.getId()+n0.getId()) == null) {
-							this.graph.addEdge(arete, n0.getId(),n1.getId()).setAttribute("date",d );
+							this.graph.addEdge(arete, n0.getId(),n1.getId()).setAttribute("date",newMap.get("aretes").get(arete).get("date") );
 						}
 					}
 	            }catch (Exception e) {
@@ -621,6 +589,13 @@ public class Map  implements Serializable {
 		//ajoute date et position d'agent sender dans la base de donne
 		dateOfPositionOtherAgents.put(sender,d );
 		positionOtherAgents.put(sender,(String) newMap.get("position").get("position").get("position") );
+		HashMap<String, Object> capscopy = newMap.get("caps").get("caps");
+	
+		for(String id: capscopy.keySet()) {
+			this.caps.put(id, capscopy.get(id));
+			
+		}
+
 	}
 	
 	// renvoie le nombre d'agents situes a une distance a un noeud donné inferieure ou egale a la distance  de l'agent
@@ -633,7 +608,7 @@ public class Map  implements Serializable {
 		Path otherpath = null;
 		
 		for (String mapKey : this.positionOtherAgents.keySet()) {
-			if(this.dateOfPositionOtherAgents.containsKey(mapKey) && (date - this.dateOfPositionOtherAgents.get(mapKey)) <= datelimite) {
+			if(this.dateOfPositionOtherAgents.containsKey(mapKey) && (date - this.dateOfPositionOtherAgents.get(mapKey)) <= datelimite && !this.positionOtherAgents.get(mapKey).equals("") ) {
 				otherpath = null;
 				try {
 					astar.compute( this.positionOtherAgents.get(mapKey), nodeID);
@@ -670,26 +645,31 @@ public class Map  implements Serializable {
 		//à ce node que moi , nombre des agent qui ont meme distance à ce node que moi, list trie (ordre alphabetique des
 		// id des agent qui sont plus proche à ce node que moi , liste trié (alphabetique ) des id des agents qui ont 
 		//meme distance que moi jusqua ce node))
+		ArrayList<Node> listNode = new ArrayList<Node>();
 		for(Node n : this.graph.getNodeSet()){
-			if(!(boolean)n.getAttribute("visite") && !n.getId().equals(mypostion)){
-				try {
-					astar.compute( mypostion,n.getId());
-					mypath = astar.getShortestPath();
-					if(mypath == null) continue;
-				}catch(Exception e){
-	    			e.printStackTrace();
-					continue;
-				}
-				ArrayList<String> list_equal = new ArrayList<String>();
-				list_equal.add(this.myAgent.getLocalName());
-				ArrayList<String> list_shorter = new ArrayList<String>();
-				list_shorter.add(this.myAgent.getLocalName());
-				int mydistance = mypath.size();
-				MyCouple a = find_nb_Agnet(n.getId(),1000L,mydistance,list_shorter,list_equal);
-				Collections.sort(list_equal);
-				Collections.sort(list_shorter);
-				list0.add(new Sextuple(n.getId(), mydistance, (int)a.getLeft(), a.getRight(), list_shorter, list_equal));
+			if(!(boolean)n.getAttribute("visite")){
+				listNode.add(n);
 			}
+		}
+		Collections.shuffle(listNode);
+		for(Node n : listNode){
+			try {
+				astar.compute( mypostion,n.getId());
+				mypath = astar.getShortestPath();
+				if(mypath == null) continue;
+			}catch(Exception e){
+    			e.printStackTrace();
+				continue;
+			}
+			ArrayList<String> list_equal = new ArrayList<String>();
+			list_equal.add(this.myAgent.getLocalName());
+			ArrayList<String> list_shorter = new ArrayList<String>();
+			list_shorter.add(this.myAgent.getLocalName());
+			int mydistance = mypath.size();
+			MyCouple a = find_nb_Agnet(n.getId(),1000L,mydistance,list_shorter,list_equal);
+			Collections.sort(list_equal);
+			Collections.sort(list_shorter);
+			list0.add(new Sextuple(n.getId(), mydistance, (int)a.getLeft(), a.getRight(), list_shorter, list_equal));
 		}
 		
 		// s'il n'y a pas de noeuds Exploration est fini
@@ -697,11 +677,11 @@ public class Map  implements Serializable {
 		//Si il y a que une seul node non visite on n'a pas besoin faire calcule
 		if(list0.size() == 1) return list0.get(0).getFirst();
 		
+		
 		//trier la liste selon ordre l'exographie
 		//Regarde method comparTo de la class Sextuple
 		Collections.sort(list0);
 		ArrayList<Sextuple> list1 = new ArrayList<Sextuple>();
-		
 		//return premier node tq il n'y a pas agent plus proche à  ce node que moi , si il exsite
 		for(int i = 0 ; i < list0.size();i++) {
 			Sextuple elem = list0.get(i);
@@ -749,8 +729,14 @@ public class Map  implements Serializable {
 	
 	
 	private MyCouple next_move() {
-		if(this.chemin == null) return new  MyCouple(this.moveAlea(),0);
-		if(this.chemin.size() == 0) return new  MyCouple(this.myPosition,0);
+		if(this.chemin == null) {
+			this.setLast_move(this.moveAlea());
+			return new  MyCouple(this.getLast_move(),0);
+		}
+		if(this.chemin.size() == 0) {
+			this.setLast_move(this.myPosition);
+			return new  MyCouple(this.myPosition,0);
+		}
 		// on renvoie notre prochain mouvement
 		String move  = this.chemin.get(0).getId();
 		this.chemin.remove(0);
@@ -768,8 +754,8 @@ public class Map  implements Serializable {
 			return new MyCouple(this.myPosition,0);
 		}
 		if(justwalk && this.chemin.size() == 0) return new MyCouple("finished",0); 
-		int nbrepet = 5;
-		if(mode.equals("speed") || justwalk) nbrepet = 10;
+		int nbrepet = 10;
+		if(justwalk || mode.equals("speed")) nbrepet = 20;
 		if(last_Position != null && myPosition.equals(last_Position)) {
 			this.addToBlockingNodes(last_Position);
 			if(this.last_move != null) this.setOfLastMove.add(this.last_move);
@@ -818,14 +804,19 @@ public class Map  implements Serializable {
 				
 			}
 		}
+		
 		if(!this.test_Chemin(target)) {
 			
 			try {
+				this.chemin = null;
 				AStar astar = new AStar(this.graph);
 				astar.compute(myPosition,target);
 				path = astar.getShortestPath();
-				if(path != null)this.chemin = path.getNodePath();
-				if(this.chemin != null && this.chemin.size() > 0)this.chemin.remove(0);
+				if(path != null) {
+					this.chemin = path.getNodePath();
+					if(this.chemin != null && this.chemin.size() > 0)this.chemin.remove(0);
+				}
+				
 			}
 			catch (Exception e) {
 				e.printStackTrace();
@@ -847,7 +838,9 @@ public class Map  implements Serializable {
 		if(c.size() == 0 ) return false;
 		if(!target.equals(c.get(c.size()-1).getId())) return false;
 		String pos = this.getPosition();
-		if(pos.equals(c.get(0).getId())) {
+		try{ if(pos.equals("") || pos.equals(c.get(0).getId())) throw new TargetWrongException("Map Test chemin For : "+this.myAgent.getLocalName()+ " target is equal to position or position wrong");}
+		catch(TargetWrongException ex) {System.out.println(ex.toString()); }
+		if( pos.equals(c.get(0).getId())) {
 			if(c.size() <= 1) return false;
 			c.remove(0);
 		}
@@ -871,9 +864,9 @@ public class Map  implements Serializable {
     		Iterator<Node> nodeIterator = courant.getNeighborNodeIterator();
     		while(nodeIterator.hasNext()) {
     			Node n = nodeIterator.next();
-    			if(! n.getId().equals(this.myPosition))list.add(n.getId());
+    			if(!n.getId().equals(this.myPosition) )list.add(n.getId());
     		}
-    		Collections.shuffle(list);
+			Collections.shuffle(list);
     		move = list.get(0);
     	}
 		catch(Exception e) {
@@ -927,7 +920,7 @@ public class Map  implements Serializable {
 		//trouves les nodes tq ils ont degre >= 80% de degre max
 		List<String> nodes = new ArrayList<String>();
 		for(Node n : this.graph.getNodeSet()) {
-			if(n.getDegree() >= (0.8 * degremax) &&  (centerActuel == null || !n.getId().equals(centerActuel))) {
+			if(n.getDegree() > (0.8 * degremax) &&  (centerActuel == null || !n.getId().equals(centerActuel))) {
 				nodes.add(n.getId());
 			}
 		}
@@ -1045,6 +1038,12 @@ public class Map  implements Serializable {
 			}
 		}
 		return 0;
+	}
+	public HashMap<String, Object> getCaps() {
+		return caps;
+	}
+	public void setCaps(HashMap<String, Object> caps) {
+		this.caps = caps;
 	}
 
 	

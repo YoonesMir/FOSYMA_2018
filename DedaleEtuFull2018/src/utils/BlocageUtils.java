@@ -152,6 +152,7 @@ public class BlocageUtils {
 		if(nodes.size() == 0) return false;
 		int maxTry = 10;
 		TreeMap<String,Double> map_apres = new TreeMap<String,Double>();
+		HashMap<String ,Double> nodesmap = new HashMap<String, Double>();
 		//si on est en mode exploration , triér ensemble des nodes non visité en order rcroissant de leur distance à nous
 		if(this.typeSerach.equals("nextForVisite")) {
 			Graph g = Graphs.clone(this.map.getGraph());
@@ -159,8 +160,7 @@ public class BlocageUtils {
 			dijkstra.init(g);
 			dijkstra.setSource(g.getNode(this.position));
 			dijkstra.compute();
-			HashMap<String ,Double> nodesmap = new HashMap<String, Double>();
-	        Comparateur comp =  new Comparateur(nodesmap,false);
+	        Comparateur comp =  new Comparateur(nodesmap,true);
 	        map_apres = new TreeMap<String,Double>(comp);
 			//pour chaque node de la list "nodes" que on viens de créé on calcul le plus 
 			//court chemin pour aller à ce node
@@ -169,16 +169,17 @@ public class BlocageUtils {
 				nodesmap.put(id, len);
 			}
 			//Trieé le hashMAp selon order des distance décroissant
-			map_apres.putAll(nodesmap);
+			
 		}else if(this.typeSerach.equals("nextTreasure")){
 			//si je suis en mode trouver un autres treasure
 			//just trie hashmap selon order envoyer par fonction find_by_type
-			double val = 0;
+			double val = 1000.0;
 			for(int i = 0 ; i< nodes.size();i++) {
-				map_apres.put(nodes.get(i), val);
-				val += 1.0;
+				nodesmap.put(nodes.get(i), val);
+				val -= 1.0;
 			}
 		}
+		map_apres.putAll(nodesmap);
 		ArrayList<String> path;
 		
 		int Try = 0 ;
@@ -195,7 +196,7 @@ public class BlocageUtils {
 		//enlever de list stenchNodes les nodes qui ont pas une voision infecte par Glum
 		//et recalculer le chemin propre
 		//on fait plus leger notre criter de chemin propre
-		if(stenchNodes.size()> 1) {
+		if(stenchNodes.size()> 0) {
 			int size1 = stenchNodes.size();
 			stenchNodes =this.list_Neighbor_non_safe_degre_1(stenchNodes);
 			if(size1 > stenchNodes.size()) {
@@ -226,7 +227,7 @@ public class BlocageUtils {
 		flag = this.build_path(this.position,null, stenchNodes,path,10,30,0,false);
 		if(flag) return this.set_path(path,false);
 		//la meme pricipe que dans fonction  plus haut
-		if(stenchNodes.size()> 1) {
+		if(stenchNodes.size()> 0) {
 			int size1 = stenchNodes.size();
 			stenchNodes =this.list_Neighbor_non_safe_degre_1(stenchNodes);
 			if(size1 > stenchNodes.size()) {
